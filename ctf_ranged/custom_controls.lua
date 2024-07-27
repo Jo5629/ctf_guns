@@ -1,61 +1,49 @@
 -- ctf_range/custom_controls.lua
 --> Modified code for scopes to work.
+local hud = mhud.init()
 
-local player_scope_huds = {}
-local activate_zoom = false
-local old_fov = 0
-local old_name = ""
+local function hide_scopehud(playerobj)
+   hud:remove(playerobj)
 
-local function scope_hud(player, change)
-   local w_item = player:get_wielded_item()
-   local gun_def = w_item:get_definition()
-   old_name = w_item:get_name()
-   local scope_zoom = gun_def.ctf_guns_scope_zoom
-   local id = player_scope_huds[player:get_player_name()]
-   if gun_def.ammo and scope_zoom == nil then
-      scope_zoom = 15
-   end
-   if change and scope_zoom then
-      player:hud_change(id, "text", "scope1.png")
-      player:set_fov(scope_zoom)
-   else
-      player:hud_change(id, "text", "rangedweapons_empty_icon.png")
-      player:set_fov(old_fov)
-   end
+   playerobj:set_fov(0, false, 0.1)
 end
 
-minetest.register_on_mods_loaded(function()
-      controls.register_on_press(function(player, control_name)
-	    if control_name == "RMB" then
-         if activate_zoom then
-            activate_zoom = false
-         else
-            activate_zoom = true
-         end
-         scope_hud(player, activate_zoom)
-	    end
-       
-      end)
-end)
+local function show_scopehud(playerobj)
+   local w_item = playerobj:get_wielded_item()
+   local def = w_item:get_definition()
+   local scope_zoom = def.ctf_guns_scope_zoom
+   if scope_zoom == nil then
+      return
+   end
 
-minetest.register_globalstep(function(dtime)
-   for _, player in pairs(minetest.get_connected_players()) do
-      local w_item = player:get_wielded_item()
-      local gun_def = w_item:get_definition()
-      if not gun_def.ammo or w_item:get_name() ~= old_name then
-         activate_zoom = false
-         scope_hud(player, activate_zoom)
+   hud:add(playerobj, "scopehud", {
+      hud_elem_type = "image",
+      position = {x = 0.5, y = 0.5},
+      image_scale = -150,
+      z_index = -100,
+      texture = "rangedweapons_scopehud.png",
+   })
+
+   playerobj:set_fov(scope_zoom, false, 0.1)
+end
+
+local scopehud_active = false
+controls.register_on_press(function(player, key)
+   local def = player:get_wielded_item():get_definition()
+   if not def.ammo or not def.groups.ranged or not def.ctf_guns_scope_zoom then
+      return
+   end
+   if key == "RMB" then
+      if not scopehud_active then
+         show_scopehud(player)
+         scopehud_active = true
+      else
+         hide_scopehud(player)
+         scopehud_active = false
       end
    end
 end)
 
 minetest.register_on_joinplayer(function(player)
-   old_fov = player:get_fov()
-      player_scope_huds[player:get_player_name()] = player:hud_add({
-	    hud_elem_type = "image",
-	    alignment = { x=0.0, y=0.0 },
-	    position = {x = 0.5, y = 0.5},
-	    scale = { x=2, y=2 },
-	    text = "rangedweapons_empty_icon.png",
-      })
+   hide_scopehud(player)
 end)
